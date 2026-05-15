@@ -1,0 +1,160 @@
+<Window x:Class="SillyRabbitMQ.UI.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
+        xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit"
+        xmlns:viewmodels="clr-namespace:SillyRabbitMQ.UI.ViewModels"
+        mc:Ignorable="d"
+        TextElement.Foreground="{DynamicResource MaterialDesignBody}"
+        TextElement.FontWeight="Regular"
+        TextElement.FontSize="13"
+        TextOptions.TextFormattingMode="Ideal"
+        TextOptions.TextRenderingMode="Auto"
+        Background="{DynamicResource MaterialDesignPaper}"
+        FontFamily="{DynamicResource MaterialDesignFont}"
+        Title="SillyRabbitMQ - Eavesdropping the cluster..." Height="720" Width="1280">
+    <materialDesign:DialogHost IsOpen="{Binding IsDialogOpen}">
+        <materialDesign:DialogHost.DialogContent>
+            <StackPanel Margin="20" Width="300">
+                <TextBlock Text="Edit Profile" Style="{StaticResource MaterialDesignHeadline6TextBlock}" Margin="0,0,0,10" />
+                <TextBox materialDesign:HintAssist.Hint="Profile Name" Text="{Binding EditingProfile.Name}" Margin="0,5" />
+                <TextBox materialDesign:HintAssist.Hint="Host" Text="{Binding EditingProfile.HostName}" Margin="0,5" />
+                <TextBox materialDesign:HintAssist.Hint="Port" Text="{Binding EditingProfile.Port}" Margin="0,5" />
+                <TextBox materialDesign:HintAssist.Hint="Virtual Host" Text="{Binding EditingProfile.VirtualHost}" Margin="0,5" />
+                <TextBox materialDesign:HintAssist.Hint="Username" Text="{Binding EditingProfile.Username}" Margin="0,5" />
+                <PasswordBox materialDesign:HintAssist.Hint="Password (Leave blank to keep existing)" Margin="0,5" x:Name="PasswordBoxControl" />
+                <CheckBox Content="Use SSL" IsChecked="{Binding EditingProfile.UseSsl}" Margin="0,10" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+                    <Button Content="Cancel" Command="{Binding CancelProfileCommand}" Style="{StaticResource MaterialDesignFlatButton}" Margin="0,0,10,0" />
+                    <Button Content="Save" Command="{Binding SaveProfileCommand}" Style="{StaticResource MaterialDesignRaisedButton}" Click="SaveProfileButton_Click" />
+                </StackPanel>
+            </StackPanel>
+        </materialDesign:DialogHost.DialogContent>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="300" />
+                <ColumnDefinition Width="5" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="5" />
+                <ColumnDefinition Width="400" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Left Pane: Connections & Explorer -->
+            <Border Grid.Column="0" Background="{DynamicResource MaterialDesignCardBackground}" Margin="10">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    
+                    <TextBlock Text="Connections" Style="{StaticResource MaterialDesignHeadline6TextBlock}" Margin="10" />
+                    
+                    <ListBox Grid.Row="1" ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}" Margin="10">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Width="240" Margin="0,5">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <materialDesign:PackIcon Grid.Column="0" Kind="ServerNetwork" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryHueLightBrush}"/>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="{Binding Name}" FontWeight="Bold" />
+                                        <TextBlock Text="{Binding HostName}" FontSize="10" Opacity="0.7" />
+                                    </StackPanel>
+                                    <Button Grid.Column="2" Command="{Binding DataContext.EditProfileCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" Style="{StaticResource MaterialDesignIconForegroundButton}" Width="24" Height="24" Padding="0" Margin="2,0">
+                                        <materialDesign:PackIcon Kind="Pencil" Width="14" Height="14" />
+                                    </Button>
+                                    <Button Grid.Column="3" Command="{Binding DataContext.DeleteProfileCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" Style="{StaticResource MaterialDesignIconForegroundButton}" Width="24" Height="24" Padding="0" Margin="2,0" Foreground="IndianRed">
+                                        <materialDesign:PackIcon Kind="Delete" Width="14" Height="14" />
+                                    </Button>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <Button Grid.Row="2" Content="Add Profile" Command="{Binding AddProfileCommand}" Style="{StaticResource MaterialDesignOutlinedButton}" Margin="10" />
+                </Grid>
+            </Border>
+
+            <!-- Splitter -->
+            <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent" />
+
+            <!-- Middle Pane: Live Message List -->
+            <Border Grid.Column="2" Background="{DynamicResource MaterialDesignCardBackground}" Margin="0,10">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="10" Background="{DynamicResource MaterialDesignToolBarBackground}">
+                        <TextBox materialDesign:HintAssist.Hint="Exchange" Text="{Binding TargetExchange, UpdateSourceTrigger=PropertyChanged}" Width="150" Margin="10" />
+                        <TextBox materialDesign:HintAssist.Hint="Routing Key" Text="{Binding TargetRoutingKey, UpdateSourceTrigger=PropertyChanged}" Width="150" Margin="10" />
+                        <Button Content="Bind" Command="{Binding BindCommand}" Style="{StaticResource MaterialDesignRaisedButton}" Margin="10" />
+                        <ToggleButton IsChecked="{Binding IsPaused, Mode=OneWay}" Command="{Binding TogglePauseCommand}" Margin="10">
+                            <ToggleButton.Style>
+                                <Style TargetType="ToggleButton" BasedOn="{StaticResource MaterialDesignRaisedButton}">
+                                    <Setter Property="Content" Value="Pause"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsPaused}" Value="True">
+                                            <Setter Property="Content" Value="Resume"/>
+                                            <Setter Property="Background" Value="Orange"/>
+                                            <Setter Property="BorderBrush" Value="Orange"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </ToggleButton.Style>
+                        </ToggleButton>
+                    </StackPanel>
+
+                    <ListView Grid.Row="1" ItemsSource="{Binding Messages}" SelectedItem="{Binding SelectedMessage}" 
+                              VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                              Margin="10">
+                        <ListView.View>
+                            <GridView>
+                                <GridViewColumn Header="Time" DisplayMemberBinding="{Binding Timestamp, StringFormat='HH:mm:ss.fff'}" Width="100"/>
+                                <GridViewColumn Header="Exchange" DisplayMemberBinding="{Binding Exchange}" Width="150"/>
+                                <GridViewColumn Header="Routing Key" DisplayMemberBinding="{Binding RoutingKey}" Width="200"/>
+                                <GridViewColumn Header="Content-Type" DisplayMemberBinding="{Binding ContentType}" Width="120"/>
+                            </GridView>
+                        </ListView.View>
+                    </ListView>
+                </Grid>
+            </Border>
+
+            <!-- Splitter -->
+            <GridSplitter Grid.Column="3" Width="5" HorizontalAlignment="Center" VerticalAlignment="Stretch" Background="Transparent" />
+
+            <!-- Right Pane: Payload Inspection -->
+            <Border Grid.Column="4" Background="{DynamicResource MaterialDesignCardBackground}" Margin="10">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="Payload Inspection" Style="{StaticResource MaterialDesignHeadline6TextBlock}" Margin="10" />
+
+                    <!-- The Silly Formatter view using AvalonEdit -->
+                    <avalonEdit:TextEditor x:Name="PayloadEditor"
+                                           Grid.Row="1" 
+                                           SyntaxHighlighting="JavaScript" 
+                                           FontFamily="Consolas"
+                                           FontSize="14"
+                                           IsReadOnly="True"
+                                           ShowLineNumbers="True"
+                                           Margin="10"
+                                           Background="#1E1E1E"
+                                           Foreground="#D4D4D4" />
+                </Grid>
+            </Border>
+        </Grid>
+    </materialDesign:DialogHost>
+</Window>

@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="SillyRabbitMQ.Core/SillyRabbitMQ.Core.csproj" />
+  <Project Path="SillyRabbitMQ.UI/SillyRabbitMQ.UI.csproj" />
+</Solution>
