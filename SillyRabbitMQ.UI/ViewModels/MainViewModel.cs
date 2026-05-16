@@ -14,7 +14,6 @@ namespace SillyRabbitMQ.UI.ViewModels
     {
         private readonly IMessageService _messageService;
         private readonly ProfileManager _profileManager;
-        private string? _currentQueueName;
 
         [ObservableProperty]
         private ObservableCollection<ConnectionProfile> _profiles = new();
@@ -23,22 +22,13 @@ namespace SillyRabbitMQ.UI.ViewModels
         private ConnectionProfile? _selectedProfile;
 
         [ObservableProperty]
-        private ObservableCollection<MessageItem> _messages = new();
+        private ObservableCollection<EavesdropSession> _sessions = new();
 
         [ObservableProperty]
-        private MessageItem? _selectedMessage;
-
-        [ObservableProperty]
-        private string _targetExchange = "amq.topic";
-
-        [ObservableProperty]
-        private string _targetRoutingKey = "#";
+        private EavesdropSession? _selectedSession;
 
         [ObservableProperty]
         private bool _isConnected;
-
-        [ObservableProperty]
-        private bool _isPaused;
 
         // Dialog Properties
         [ObservableProperty]
@@ -53,6 +43,9 @@ namespace SillyRabbitMQ.UI.ViewModels
             _profileManager = profileManager;
 
             LoadProfiles();
+            
+            // Start with one default session
+            AddSession();
         }
 
         private void LoadProfiles()
@@ -75,7 +68,6 @@ namespace SillyRabbitMQ.UI.ViewModels
         {
             if (value != null && !IsDialogOpen)
             {
-                // Automatically connect when a profile is selected
                 ConnectCommand.ExecuteAsync(null);
             }
         }
@@ -92,7 +84,6 @@ namespace SillyRabbitMQ.UI.ViewModels
         private void EditProfile(ConnectionProfile profile)
         {
             if (profile == null) return;
-            // Create a clone to edit
             EditingProfile = new ConnectionProfile
             {
                 Id = profile.Id,
@@ -142,32 +133,61 @@ namespace SillyRabbitMQ.UI.ViewModels
         }
 
         [RelayCommand]
+        private void AddSession()
+        {
+            var session = new EavesdropSession(_messageService);
+            Sessions.Add(session);
+            SelectedSession = session;
+        }
+
+        [RelayCommand]
+        private async Task CloseSessionAsync(EavesdropSession session)
+        {
+            if (session != null)
+            {
+                await session.CleanupAsync();
+                Sessions.Remove(session);
+                if (Sessions.Count == 0)
+                {
+                    AddSession();
+                }
+            }
+        }
+
+        [RelayCommand]
         private async Task ConnectAsync()
         {
             if (SelectedProfile == null) return;
+
+            // Reset statuses
+            foreach (var p in Profiles) p.Status = ConnectionStatus.Disconnected;
+
+            SelectedProfile.Status = ConnectionStatus.Connecting;
 
             try
             {
                 await _messageService.DisconnectAsync();
                 await _messageService.ConnectAsync(SelectedProfile);
                 IsConnected = _messageService.IsConnected;
+                SelectedProfile.Status = ConnectionStatus.Connected;
                 
-                // Clear existing messages
-                Messages.Clear();
-                IsPaused = false;
-                _currentQueueName = null;
-                
-                MessageBox.Show($"Connected to {SelectedProfile.HostName}!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+                // Clear messages in all sessions
+                foreach (var session in Sessions)
+                {
+                    session.Messages.Clear();
+                    session.IsPaused = false;
+                }
             }
             catch (Exception ex)
             {
                 IsConnected = false;
+                SelectedProfile.Status = ConnectionStatus.Failed;
                 MessageBox.Show($"Failed to connect: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         [RelayCommand]
-        private async Task BindAsync()
+        private async Task BrowseServerEntitiesAsync()
         {
             if (!_messageService.IsConnected)
             {
@@ -177,61 +197,89 @@ namespace SillyRabbitMQ.UI.ViewModels
 
             try
             {
-                if (!string.IsNullOrEmpty(_currentQueueName))
-                {
-                    await _messageService.StopEavesdroppingAsync(_currentQueueName);
-                }
+                var exchanges = await _messageService.GetExchangesAsync();
+                var queues = await _messageService.GetQueuesAsync();
+                
+                var exchangeList = exchanges.Any() ? string.Join("\n", exchanges.Take(20)) + (exchanges.Count() > 20 ? "\n...and more" : "") : "None";
+                var queueList = queues.Any() ? string.Join("\n", queues.Take(20)) + (queues.Count() > 20 ? "\n...and more" : "") : "None";
 
-                Messages.Clear();
-                IsPaused = false;
-
-                _currentQueueName = await _messageService.StartEavesdroppingAsync(TargetExchange, TargetRoutingKey, OnMessageReceived);
+                var msg = $"--- EXCHANGES ---\n{exchangeList}\n\n--- QUEUES ---\n{queueList}";
+                MessageBox.Show(msg, "Server Entities (Top 20)", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to bind: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"Failed to fetch entities: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
         [RelayCommand]
-        private async Task TogglePauseAsync()
+        private async Task PublishEditedMessageAsync(string payload)
         {
-            if (string.IsNullOrEmpty(_currentQueueName)) return;
+            if (!_messageService.IsConnected || SelectedSession == null)
+            {
+                MessageBox.Show("Please connect and select a session.", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
 
             try
             {
-                if (IsPaused)
-                {
-                    // Resume
-                    await _messageService.ResumeEavesdroppingAsync(_currentQueueName, OnMessageReceived);
-                    IsPaused = false;
-                }
-                else
-                {
-                    // Pause
-                    await _messageService.PauseEavesdroppingAsync(_currentQueueName);
-                    IsPaused = true;
-                }
+                var headers = SelectedSession.SelectedMessage?.Headers;
+                await _messageService.PublishMessageAsync(SelectedSession.TargetExchange, SelectedSession.TargetRoutingKey, payload, headers);
+                MessageBox.Show("Message published successfully!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to toggle pause: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"Failed to publish: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
             }
         }
 
-        private void OnMessageReceived(MessageItem message)
+        [RelayCommand]
+        private async Task RescueDlqMessageAsync(string payload)
         {
-            // Marshal back to UI thread
-            Application.Current.Dispatcher.Invoke(() =>
+            if (!_messageService.IsConnected || SelectedSession?.SelectedMessage == null)
             {
-                Messages.Insert(0, message); // Add to top
+                MessageBox.Show("Please select a message to rescue.", "Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
 
-                // Optional: enforce a max limit to prevent out of memory
-                if (Messages.Count > 1000)
+            var msg = SelectedSession.SelectedMessage;
+            
+            // Look for x-death headers to find original exchange/routing key
+            string? originalExchange = null;
+            string? originalRoutingKey = null;
+
+            if (msg.Headers != null && msg.Headers.TryGetValue("x-death", out var xDeathObj))
+            {
+                if (xDeathObj is System.Collections.Generic.List<object> xDeathList && xDeathList.Count > 0)
                 {
-                    Messages.RemoveAt(Messages.Count - 1);
+                    if (xDeathList[0] is System.Collections.Generic.IDictionary<string, object> deathEntry)
+                    {
+                        if (deathEntry.TryGetValue("exchange", out var exObj) && exObj is byte[] exBytes)
+                            originalExchange = System.Text.Encoding.UTF8.GetString(exBytes);
+                        
+                        if (deathEntry.TryGetValue("routing-keys", out var rkObj) && rkObj is System.Collections.Generic.List<object> rkList && rkList.Count > 0)
+                            if (rkList[0] is byte[] rkBytes)
+                                originalRoutingKey = System.Text.Encoding.UTF8.GetString(rkBytes);
+                    }
                 }
-            });
+            }
+
+            if (originalExchange == null || originalRoutingKey == null)
+            {
+                MessageBox.Show("Could not find x-death headers to determine original destination. Cannot automatically rescue.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
+
+            try
+            {
+                await _messageService.PublishMessageAsync(originalExchange, originalRoutingKey, payload, msg.Headers);
+                MessageBox.Show($"Rescued to Exchange '{originalExchange}' with Routing Key '{originalRoutingKey}'!", "Success", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to rescue: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
+
     }
 }

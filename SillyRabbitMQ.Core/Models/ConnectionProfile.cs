@@ -1,22 +1,42 @@
 using System;
+using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace SillyRabbitMQ.Core.Models
 {
-    public class ConnectionProfile
+    public enum ConnectionStatus
     {
-        public Guid Id { get; set; } = Guid.NewGuid();
-        public string Name { get; set; } = "New Profile";
-        public string HostName { get; set; } = "localhost";
-        public int Port { get; set; } = 5672;
-        public string VirtualHost { get; set; } = "/";
-        public string Username { get; set; } = "guest";
+        Disconnected,
+        Connecting,
+        Connected,
+        Failed
+    }
+
+    public partial class ConnectionProfile : ObservableObject
+    {
+        public string Id { get; set; } = Guid.NewGuid().ToString();
+
+        [ObservableProperty]
+        private string _name = "New Profile";
         
-        // This should be stored securely (e.g., using DPAPI)
+        [ObservableProperty]
+        private string _hostName = "localhost";
+
+        [ObservableProperty]
+        private int _port = 5672;
+
+        [ObservableProperty]
+        private string _virtualHost = "/";
+
+        [ObservableProperty]
+        private string _username = "guest";
+
         public string Password { get; set; } = "guest";
         
-        public bool UseSsl { get; set; } = false;
-        
-        // Streams specific
-        public int StreamPort { get; set; } = 5552;
+        [ObservableProperty]
+        private bool _useSsl = false;
+
+        [ObservableProperty]
+        [System.Text.Json.Serialization.JsonIgnore]
+        private ConnectionStatus _status = ConnectionStatus.Disconnected;
     }
 }

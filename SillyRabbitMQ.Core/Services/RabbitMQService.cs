@@ -16,6 +16,8 @@ namespace SillyRabbitMQ.Core.Services
 
         public bool IsConnected => _connection?.IsOpen == true && _channel?.IsOpen == true;
 
+        private HttpClient? _httpClient;
+        
         public async Task ConnectAsync(ConnectionProfile profile)
         {
             var factory = new ConnectionFactory
@@ -34,6 +36,16 @@ namespace SillyRabbitMQ.Core.Services
 
             _connection = await factory.CreateConnectionAsync();
             _channel = await _connection.CreateChannelAsync();
+
+            var handler = new System.Net.Http.HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true
+            };
+            _httpClient = new HttpClient(handler);
+            var scheme = profile.UseSsl ? "https" : "http";
+            _httpClient.BaseAddress = new Uri($"{scheme}://{profile.HostName}:15672/");
+            var auth = Convert.ToBase64String(Encoding.ASCII.GetBytes($"{profile.Username}:{profile.Password}"));
+            _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", auth);
         }
 
         public async Task DisconnectAsync()
@@ -46,6 +58,8 @@ namespace SillyRabbitMQ.Core.Services
             {
                 await _connection.CloseAsync();
             }
+            _httpClient?.Dispose();
+            _httpClient = null;
         }
 
         public async Task<string> StartEavesdroppingAsync(string exchange, string routingKey, Action<MessageItem> onMessageReceived)
@@ -141,14 +155,43 @@ namespace SillyRabbitMQ.Core.Services
             return PublishMessageAsync(targetExchange, targetRoutingKey, message.PayloadString, message.Headers);
         }
 
-        public Task<IEnumerable<string>> GetExchangesAsync()
+        private class EntityDto
         {
-            return Task.FromResult<IEnumerable<string>>(new List<string>());
+            public string name { get; set; } = string.Empty;
         }
 
-        public Task<IEnumerable<string>> GetQueuesAsync()
+        public async Task<IEnumerable<string>> GetExchangesAsync()
         {
-            return Task.FromResult<IEnumerable<string>>(new List<string>());
+            if (_httpClient == null) return new List<string>();
+            try
+            {
+                var response = await _httpClient.GetAsync("api/exchanges");
+                response.EnsureSuccessStatusCode();
+                var json = await response.Content.ReadAsStringAsync();
+                var list = System.Text.Json.JsonSerializer.Deserialize<List<EntityDto>>(json);
+                return list?.Select(e => e.name).Where(n => !string.IsNullOrEmpty(n)) ?? new List<string>();
+            }
+            catch
+            {
+                return new List<string>();
+            }
+        }
+
+        public async Task<IEnumerable<string>> GetQueuesAsync()
+        {
+            if (_httpClient == null) return new List<string>();
+            try
+            {
+                var response = await _httpClient.GetAsync("api/queues");
+                response.EnsureSuccessStatusCode();
+                var json = await response.Content.ReadAsStringAsync();
+                var list = System.Text.Json.JsonSerializer.Deserialize<List<EntityDto>>(json);
+                return list?.Select(e => e.name).Where(n => !string.IsNullOrEmpty(n)) ?? new List<string>();
+            }
+            catch
+            {
+                return new List<string>();
+            }
         }
 
         public void Dispose()

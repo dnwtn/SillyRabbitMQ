@@ -6,6 +6,7 @@
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
         xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit"
         xmlns:viewmodels="clr-namespace:SillyRabbitMQ.UI.ViewModels"
+        xmlns:scottplot="clr-namespace:ScottPlot.WPF;assembly=ScottPlot.WPF"
         mc:Ignorable="d"
         TextElement.Foreground="{DynamicResource MaterialDesignBody}"
         TextElement.FontWeight="Regular"
@@ -14,17 +15,17 @@
         TextOptions.TextRenderingMode="Auto"
         Background="{DynamicResource MaterialDesignPaper}"
         FontFamily="{DynamicResource MaterialDesignFont}"
-        Title="SillyRabbitMQ - Eavesdropping the cluster..." Height="720" Width="1280">
+        Title="SillyRabbitMQ - Eavesdropping the cluster..." Height="768" Width="1366">
     <materialDesign:DialogHost IsOpen="{Binding IsDialogOpen}">
         <materialDesign:DialogHost.DialogContent>
             <StackPanel Margin="20" Width="300">
                 <TextBlock Text="Edit Profile" Style="{StaticResource MaterialDesignHeadline6TextBlock}" Margin="0,0,0,10" />
-                <TextBox materialDesign:HintAssist.Hint="Profile Name" Text="{Binding EditingProfile.Name}" Margin="0,5" />
-                <TextBox materialDesign:HintAssist.Hint="Host" Text="{Binding EditingProfile.HostName}" Margin="0,5" />
-                <TextBox materialDesign:HintAssist.Hint="Port" Text="{Binding EditingProfile.Port}" Margin="0,5" />
-                <TextBox materialDesign:HintAssist.Hint="Virtual Host" Text="{Binding EditingProfile.VirtualHost}" Margin="0,5" />
-                <TextBox materialDesign:HintAssist.Hint="Username" Text="{Binding EditingProfile.Username}" Margin="0,5" />
-                <PasswordBox materialDesign:HintAssist.Hint="Password (Leave blank to keep existing)" Margin="0,5" x:Name="PasswordBoxControl" />
+                <TextBox materialDesign:HintAssist.Hint="Profile Name" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Text="{Binding EditingProfile.Name}" Margin="0,5" />
+                <TextBox materialDesign:HintAssist.Hint="Host" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Text="{Binding EditingProfile.HostName}" Margin="0,5" />
+                <TextBox materialDesign:HintAssist.Hint="Port" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Text="{Binding EditingProfile.Port}" Margin="0,5" />
+                <TextBox materialDesign:HintAssist.Hint="Virtual Host" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Text="{Binding EditingProfile.VirtualHost}" Margin="0,5" />
+                <TextBox materialDesign:HintAssist.Hint="Username" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Text="{Binding EditingProfile.Username}" Margin="0,5" />
+                <PasswordBox materialDesign:HintAssist.Hint="Password (Leave blank to keep existing)" Style="{StaticResource MaterialDesignFloatingHintPasswordBox}" Margin="0,5" x:Name="PasswordBoxControl" />
                 <CheckBox Content="Use SSL" IsChecked="{Binding EditingProfile.UseSsl}" Margin="0,10" />
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
                     <Button Content="Cancel" Command="{Binding CancelProfileCommand}" Style="{StaticResource MaterialDesignFlatButton}" Margin="0,0,10,0" />
@@ -50,8 +51,14 @@
                         <RowDefinition Height="*" />
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
-                    
-                    <TextBlock Text="Connections" Style="{StaticResource MaterialDesignHeadline6TextBlock}" Margin="10" />
+                    <Grid Grid.Row="0" Margin="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Connections" Style="{StaticResource MaterialDesignHeadline6TextBlock}" VerticalAlignment="Center" />
+                        <ToggleButton x:Name="ThemeToggle" Grid.Column="1" Click="ThemeToggle_Click" IsChecked="True" ToolTip="Toggle Dark/Light Mode" Style="{StaticResource MaterialDesignSwitchToggleButton}" />
+                    </Grid>
                     
                     <ListBox Grid.Row="1" ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}" Margin="10">
                         <ListBox.ItemTemplate>
@@ -63,7 +70,26 @@
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <materialDesign:PackIcon Grid.Column="0" Kind="ServerNetwork" VerticalAlignment="Center" Margin="0,0,10,0" Foreground="{DynamicResource PrimaryHueLightBrush}"/>
+                                    
+                                    <Ellipse Grid.Column="0" Width="10" Height="10" Margin="0,0,10,0" VerticalAlignment="Center">
+                                        <Ellipse.Style>
+                                            <Style TargetType="Ellipse">
+                                                <Setter Property="Fill" Value="Gray" />
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Status}" Value="Connected">
+                                                        <Setter Property="Fill" Value="LimeGreen" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Status}" Value="Connecting">
+                                                        <Setter Property="Fill" Value="Gold" />
+                                                    </DataTrigger>
+                                                    <DataTrigger Binding="{Binding Status}" Value="Failed">
+                                                        <Setter Property="Fill" Value="Red" />
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Ellipse.Style>
+                                    </Ellipse>
+
                                     <StackPanel Grid.Column="1">
                                         <TextBlock Text="{Binding Name}" FontWeight="Bold" />
                                         <TextBlock Text="{Binding HostName}" FontSize="10" Opacity="0.7" />
@@ -79,7 +105,10 @@
                         </ListBox.ItemTemplate>
                     </ListBox>
 
-                    <Button Grid.Row="2" Content="Add Profile" Command="{Binding AddProfileCommand}" Style="{StaticResource MaterialDesignOutlinedButton}" Margin="10" />
+                    <StackPanel Grid.Row="2" Orientation="Vertical">
+                        <Button Content="Browse Server Entities" Command="{Binding BrowseServerEntitiesCommand}" Style="{StaticResource MaterialDesignRaisedButton}" Margin="10,0,10,0" materialDesign:ButtonProgressAssist.IsIndicatorVisible="False" />
+                        <Button Content="Add Profile" Command="{Binding AddProfileCommand}" Style="{StaticResource MaterialDesignRaisedButton}" Margin="10" />
+                    </StackPanel>
                 </Grid>
             </Border>
 
@@ -93,39 +122,82 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
-
-                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="10" Background="{DynamicResource MaterialDesignToolBarBackground}">
-                        <TextBox materialDesign:HintAssist.Hint="Exchange" Text="{Binding TargetExchange, UpdateSourceTrigger=PropertyChanged}" Width="150" Margin="10" />
-                        <TextBox materialDesign:HintAssist.Hint="Routing Key" Text="{Binding TargetRoutingKey, UpdateSourceTrigger=PropertyChanged}" Width="150" Margin="10" />
-                        <Button Content="Bind" Command="{Binding BindCommand}" Style="{StaticResource MaterialDesignRaisedButton}" Margin="10" />
-                        <ToggleButton IsChecked="{Binding IsPaused, Mode=OneWay}" Command="{Binding TogglePauseCommand}" Margin="10">
-                            <ToggleButton.Style>
-                                <Style TargetType="ToggleButton" BasedOn="{StaticResource MaterialDesignRaisedButton}">
-                                    <Setter Property="Content" Value="Pause"/>
-                                    <Style.Triggers>
-                                        <DataTrigger Binding="{Binding IsPaused}" Value="True">
-                                            <Setter Property="Content" Value="Resume"/>
-                                            <Setter Property="Background" Value="Orange"/>
-                                            <Setter Property="BorderBrush" Value="Orange"/>
-                                        </DataTrigger>
-                                    </Style.Triggers>
-                                </Style>
-                            </ToggleButton.Style>
-                        </ToggleButton>
+                    
+                    <StackPanel Orientation="Horizontal" Margin="10" HorizontalAlignment="Right">
+                        <Button Command="{Binding AddSessionCommand}" Style="{StaticResource MaterialDesignFloatingActionMiniButton}" ToolTip="Add New Tab" Width="30" Height="30">
+                            <materialDesign:PackIcon Kind="Plus" />
+                        </Button>
                     </StackPanel>
 
-                    <ListView Grid.Row="1" ItemsSource="{Binding Messages}" SelectedItem="{Binding SelectedMessage}" 
-                              VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
-                              Margin="10">
-                        <ListView.View>
-                            <GridView>
-                                <GridViewColumn Header="Time" DisplayMemberBinding="{Binding Timestamp, StringFormat='HH:mm:ss.fff'}" Width="100"/>
-                                <GridViewColumn Header="Exchange" DisplayMemberBinding="{Binding Exchange}" Width="150"/>
-                                <GridViewColumn Header="Routing Key" DisplayMemberBinding="{Binding RoutingKey}" Width="200"/>
-                                <GridViewColumn Header="Content-Type" DisplayMemberBinding="{Binding ContentType}" Width="120"/>
-                            </GridView>
-                        </ListView.View>
-                    </ListView>
+                    <TabControl Grid.Row="1" ItemsSource="{Binding Sessions}" SelectedItem="{Binding SelectedSession}" Margin="0,10,0,0" SelectionChanged="TabControl_SelectionChanged">
+                        <TabControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBox Text="{Binding Header, UpdateSourceTrigger=PropertyChanged}" 
+                                             Background="Transparent" BorderThickness="0" 
+                                             VerticalAlignment="Center" Margin="0,0,10,0"
+                                             Foreground="{DynamicResource MaterialDesignBody}"/>
+                                    <Button Command="{Binding DataContext.CloseSessionCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" Style="{StaticResource MaterialDesignIconForegroundButton}" Width="20" Height="20" Padding="0">
+                                        <materialDesign:PackIcon Kind="Close" Width="12" Height="12"/>
+                                    </Button>
+                                </StackPanel>
+                            </DataTemplate>
+                        </TabControl.ItemTemplate>
+                        <TabControl.ContentTemplate>
+                            <DataTemplate>
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+
+                                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="5" Background="Transparent">
+                                        <TextBox materialDesign:HintAssist.Hint="Exchange" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Text="{Binding TargetExchange, UpdateSourceTrigger=PropertyChanged}" Width="150" Margin="10,0,10,10" />
+                                        <TextBox materialDesign:HintAssist.Hint="Routing Key" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Text="{Binding TargetRoutingKey, UpdateSourceTrigger=PropertyChanged}" Width="150" Margin="10,0,10,10" />
+                                        <TextBox materialDesign:HintAssist.Hint="Regex Filter (Body)" Style="{StaticResource MaterialDesignFloatingHintTextBox}" Text="{Binding TargetRegexFilter, UpdateSourceTrigger=PropertyChanged}" Width="150" Margin="10,0,10,10" />
+                                        
+                                        <Button Content="Bind" Command="{Binding BindCommand}" Style="{StaticResource MaterialDesignRaisedButton}" Margin="10,5" />
+                                        
+                                        <Button Command="{Binding ClearFilterCommand}" Style="{StaticResource MaterialDesignIconForegroundButton}" ToolTip="Clear Bind" Margin="0,5,10,5">
+                                            <materialDesign:PackIcon Kind="FilterRemoveOutline" />
+                                        </Button>
+
+                                        <ToggleButton IsChecked="{Binding IsPaused, Mode=OneWay}" Command="{Binding TogglePauseCommand}" Margin="10,5">
+                                            <ToggleButton.Style>
+                                                <Style TargetType="ToggleButton" BasedOn="{StaticResource MaterialDesignRaisedButton}">
+                                                    <Setter Property="Content" Value="Pause"/>
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding IsPaused}" Value="True">
+                                                            <Setter Property="Content" Value="Resume"/>
+                                                            <Setter Property="Background" Value="Orange"/>
+                                                            <Setter Property="BorderBrush" Value="Orange"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </ToggleButton.Style>
+                                        </ToggleButton>
+
+                                        <Button Command="{Binding ClearMessagesCommand}" Style="{StaticResource MaterialDesignIconForegroundButton}" ToolTip="Clear Queue" Margin="10,5">
+                                            <materialDesign:PackIcon Kind="TrashCanOutline" />
+                                        </Button>
+                                    </StackPanel>
+
+                                    <ListView Grid.Row="1" ItemsSource="{Binding Messages}" SelectedItem="{Binding SelectedMessage}" 
+                                              VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                                              Margin="10" SelectionChanged="ListView_SelectionChanged">
+                                        <ListView.View>
+                                            <GridView>
+                                                <GridViewColumn Header="Time" DisplayMemberBinding="{Binding Timestamp, StringFormat='HH:mm:ss.fff'}" Width="100"/>
+                                                <GridViewColumn Header="Exchange" DisplayMemberBinding="{Binding Exchange}" Width="150"/>
+                                                <GridViewColumn Header="Routing Key" DisplayMemberBinding="{Binding RoutingKey}" Width="200"/>
+                                                <GridViewColumn Header="Content-Type" DisplayMemberBinding="{Binding ContentType}" Width="120"/>
+                                            </GridView>
+                                        </ListView.View>
+                                    </ListView>
+                                </Grid>
+                            </DataTemplate>
+                        </TabControl.ContentTemplate>
+                    </TabControl>
                 </Grid>
             </Border>
 
@@ -138,9 +210,21 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <TextBlock Text="Payload Inspection" Style="{StaticResource MaterialDesignHeadline6TextBlock}" Margin="10" />
+                    <Grid Grid.Row="0" Margin="10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Text="Payload Inspection" Style="{StaticResource MaterialDesignHeadline6TextBlock}" />
+                        
+                        <StackPanel Grid.Column="1" Orientation="Horizontal">
+                            <Button Content="Re-Publish" Click="RePublish_Click" Style="{StaticResource MaterialDesignOutlinedButton}" Margin="0,0,10,0" ToolTip="Publish the editor contents to the current session's exchange/routing key" />
+                            <Button Content="DLQ Rescue" Click="DlqRescue_Click" Style="{StaticResource MaterialDesignRaisedLightButton}" ToolTip="Requeue this message to its original exchange using x-death headers" />
+                        </StackPanel>
+                    </Grid>
 
                     <!-- The Silly Formatter view using AvalonEdit -->
                     <avalonEdit:TextEditor x:Name="PayloadEditor"
@@ -148,11 +232,14 @@
                                            SyntaxHighlighting="JavaScript" 
                                            FontFamily="Consolas"
                                            FontSize="14"
-                                           IsReadOnly="True"
+                                           IsReadOnly="False"
                                            ShowLineNumbers="True"
                                            Margin="10"
-                                           Background="#1E1E1E"
-                                           Foreground="#D4D4D4" />
+                                           Background="Transparent"
+                                           Foreground="#FFFFFF" />
+
+                    <!-- Telemetry Graph -->
+                    <scottplot:WpfPlot x:Name="TelemetryPlot" Grid.Row="2" Height="150" Margin="10,0,10,10" />
                 </Grid>
             </Border>
         </Grid>
