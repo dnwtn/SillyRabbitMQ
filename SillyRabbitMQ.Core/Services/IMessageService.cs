@@ -8,7 +8,13 @@ namespace SillyRabbitMQ.Core.Services
     public interface IMessageService : IAsyncDisposable, IDisposable
     {
         bool IsConnected { get; }
-        
+
+        /// <summary>
+        /// Assign a callback to be notified when the connection drops unexpectedly.
+        /// The string argument is the broker's shutdown reason.
+        /// </summary>
+        Action<string>? OnConnectionInterrupted { get; set; }
+
         Task ConnectAsync(ConnectionProfile profile);
         Task DisconnectAsync();
         

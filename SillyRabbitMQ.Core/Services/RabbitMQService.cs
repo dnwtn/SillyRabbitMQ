@@ -16,6 +16,12 @@ namespace SillyRabbitMQ.Core.Services
 
         public bool IsConnected => _connection?.IsOpen == true && _channel?.IsOpen == true;
 
+        /// <summary>
+        /// Invoked when the connection drops unexpectedly (network loss, broker restart, etc.).
+        /// The string argument is the shutdown reason message.
+        /// </summary>
+        public Action<string>? OnConnectionInterrupted { get; set; }
+
         private HttpClient? _httpClient;
         
         public async Task ConnectAsync(ConnectionProfile profile)
@@ -35,6 +41,10 @@ namespace SillyRabbitMQ.Core.Services
             }
 
             _connection = await factory.CreateConnectionAsync();
+
+            // Detect unexpected disconnections
+            _connection.ConnectionShutdownAsync += OnConnectionShutdownAsync;
+
             _channel = await _connection.CreateChannelAsync();
 
             var handler = new System.Net.Http.HttpClientHandler
@@ -48,8 +58,22 @@ namespace SillyRabbitMQ.Core.Services
             _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", auth);
         }
 
+        private Task OnConnectionShutdownAsync(object sender, ShutdownEventArgs e)
+        {
+            // Only fire the callback for unexpected shutdowns (not clean user-initiated closes)
+            if (e.Initiator != ShutdownInitiator.Application)
+            {
+                OnConnectionInterrupted?.Invoke(e.ReplyText ?? "Connection lost");
+            }
+            return Task.CompletedTask;
+        }
+
         public async Task DisconnectAsync()
         {
+            if (_connection != null)
+            {
+                _connection.ConnectionShutdownAsync -= OnConnectionShutdownAsync;
+            }
             if (_channel != null && _channel.IsOpen)
             {
                 await _channel.CloseAsync();

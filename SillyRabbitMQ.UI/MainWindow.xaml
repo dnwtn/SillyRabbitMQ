@@ -63,7 +63,10 @@
                     <ListBox Grid.Row="1" ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}" Margin="10">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Grid Width="240" Margin="0,5">
+                                <Grid Width="240" Margin="0,5" Cursor="Hand">
+                                    <Grid.InputBindings>
+                                        <MouseBinding MouseAction="LeftClick" Command="{Binding DataContext.ReconnectCommand, RelativeSource={RelativeSource AncestorType=Window}}" />
+                                    </Grid.InputBindings>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />

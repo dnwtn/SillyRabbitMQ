@@ -72,6 +72,20 @@ namespace SillyRabbitMQ.UI.ViewModels
             }
         }
 
+        /// <summary>
+        /// Re-run the connect flow even if the profile is already selected.
+        /// Bound to the profile card's MouseLeftButtonUp so clicking an already-active
+        /// (e.g. red/failed) profile retries the connection.
+        /// </summary>
+        [RelayCommand]
+        private async Task ReconnectAsync()
+        {
+            if (SelectedProfile != null && !IsDialogOpen)
+            {
+                await ConnectAsync();
+            }
+        }
+
         // Profile Management Commands
         [RelayCommand]
         private void AddProfile()
@@ -166,11 +180,25 @@ namespace SillyRabbitMQ.UI.ViewModels
 
             try
             {
+                // Clear any previous interruption callback
+                _messageService.OnConnectionInterrupted = null;
+
                 await _messageService.DisconnectAsync();
                 await _messageService.ConnectAsync(SelectedProfile);
                 IsConnected = _messageService.IsConnected;
                 SelectedProfile.Status = ConnectionStatus.Connected;
-                
+
+                // Capture the profile reference at connect time so the closure stays correct
+                var connectedProfile = SelectedProfile;
+                _messageService.OnConnectionInterrupted = reason =>
+                {
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        IsConnected = false;
+                        connectedProfile.Status = ConnectionStatus.Failed;
+                    });
+                };
+
                 // Clear messages in all sessions
                 foreach (var session in Sessions)
                 {
